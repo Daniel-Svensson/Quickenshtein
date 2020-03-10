@@ -11,7 +11,7 @@ namespace Quickenshtein.Benchmarks
 		Attributes.ShortRunJob]
 	public class FillRowBenchmarks
 	{
-
+		[Params(40, 400, 4000)]
 		int ArrayCount { get; set; } = 400;
 		int[] _array;
 
@@ -21,13 +21,13 @@ namespace Quickenshtein.Benchmarks
 			_array = new int[ArrayCount];
 		}
 
-		[Benchmark]
+		[Benchmark(Baseline = true)]
 		public void Simple()
 		{
 			FillRow(_array);
 		}
 
-		[Benchmark]
+	//	[Benchmark]
 		public unsafe void Pointer()
 		{
 			fixed (int* data = _array)
@@ -46,10 +46,23 @@ namespace Quickenshtein.Benchmarks
 			fixed (int* data = _array)
 				FillRowUnroll(data, _array.Length);
 		}
+
 		[Benchmark]
 		public unsafe void Simd()
 		{
 			FillRowSimd(_array);
+		}
+
+		[Benchmark]
+		public unsafe void QuickensteingAvx()
+		{
+			Quickenshtein.Levenshtein.FillRow_Avx2(_array);
+		}
+
+		[Benchmark]
+		public unsafe void QuickensteingSSe()
+		{
+			Quickenshtein.Levenshtein.FillRow_Sse2(_array);
 		}
 
 
@@ -115,6 +128,7 @@ namespace Quickenshtein.Benchmarks
 				previousRow[i] = i;
 			}
 		}
+
 
 		/// <summary>
 		/// Fills <paramref name="previousRow"/> with a number sequence from 1 to the length of the row.

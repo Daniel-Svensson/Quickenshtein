@@ -28,7 +28,7 @@ namespace Quickenshtein.Benchmarks
 			//benchmark.Setup();
 			//benchmark.Quickenshtein();
 			//return;
-			//BenchmarkRunner.Run(typeof(FillRowBenchmarks));
+			BenchmarkRunner.Run(typeof(FillRowBenchmarks));
 			BenchmarkRunner.Run(typeof(MediumTextComparisonBenchmark));
 			return;
 

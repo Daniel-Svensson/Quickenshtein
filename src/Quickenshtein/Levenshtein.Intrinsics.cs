@@ -97,7 +97,7 @@ namespace Quickenshtein
 		/// </summary>
 		/// <param name="previousRow"></param>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static unsafe void FillRow_Avx2(Span<int> previousRow)
+		public static unsafe void FillRow_Avx2(Span<int> previousRow)
 		{
 			var columnIndex = 0;
 			var columnsRemaining = previousRow.Length;
@@ -138,7 +138,7 @@ namespace Quickenshtein
 		/// </summary>
 		/// <param name="previousRow"></param>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static unsafe void FillRow_Sse2(Span<int> previousRow)
+		public static unsafe void FillRow_Sse2(Span<int> previousRow)
 		{
 			var columnIndex = 0;
 			var columnsRemaining = previousRow.Length;
