@@ -70,12 +70,12 @@ namespace Quickenshtein.Benchmarks
 			//ArrayPool values are sometimes bigger than allocated, let's trim our span to exactly what we use
 			previousRow = previousRow.Slice(0, targetLength);
 
-			FillRow(previousRow);
-
 			fixed (char* targetPtr = target)
 			fixed (char* srcPtr = source)
 			fixed (int* previousRowPtr = previousRow)
 			{
+				FillRow(previousRowPtr, targetLength);
+
 				var rowIndex = 0;
 
 				//var sourceV = Vector128<short>.Zero;
@@ -115,7 +115,6 @@ namespace Quickenshtein.Benchmarks
 						left = next;
 						diag = up;
 					}
-
 
 					previousRow[0] = Sse42.Extract(left, 7);
 					for (int columnIndex = 8; columnIndex < targetLength; columnIndex++)
@@ -205,15 +204,31 @@ namespace Quickenshtein.Benchmarks
 		/// <summary>
 		/// Fills <paramref name="previousRow"/> with a number sequence from 1 to the length of the row.
 		/// </summary>
-		/// <param name="previousRow"></param>
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static unsafe void FillRow(Span<int> previousRow)
-		{
-			for (int i=0; i < previousRow.Length; ++i)
+		private static unsafe void FillRow(int* previousRow, int length)
+        {
+			for (int i = 0; i < length; ++i)
 			{
-				previousRow[i] = i+1;
+				previousRow[i] = i + 1;
 			}
 		}
+
+		/// <summary>
+		/// Fills <paramref name="previousRow"/> with a number sequence from 1 to the length of the row.
+		/// </summary>
+		private static unsafe void FillRow(ushort* previousRow, int length)
+		{
+			int end = Math.Min(length, ushort.MaxValue-1);
+			for (ushort i = 0; i < end;)
+			{
+				previousRow[i] = (ushort)++i;
+			}
+
+			for (int i = ushort.MaxValue; i < length;)
+			{
+				previousRow[i] = ushort.MaxValue;
+			}
+		}
+
 
 		/// <summary>
 		/// Calculates the costs for an entire row of the virtual matrix.

@@ -69,11 +69,11 @@ namespace Quickenshtein.Benchmarks
 			//ArrayPool values are sometimes bigger than allocated, let's trim our span to exactly what we use
 			previousRow = previousRow.Slice(0, targetLength);
 
-			FillRow(previousRow);
-
 			fixed (char* targetPtr = target)
 			fixed (int* previousRowPtr = previousRow)
 			{
+				FillRow(previousRowPtr, targetLength);
+
 				//Calculate Single Rows
 				for (int rowIndex = 0; rowIndex < source.Length; rowIndex++)
 				{
@@ -106,12 +106,11 @@ namespace Quickenshtein.Benchmarks
 		/// Fills <paramref name="previousRow"/> with a number sequence from 1 to the length of the row.
 		/// </summary>
 		/// <param name="previousRow"></param>
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static unsafe void FillRow(Span<int> previousRow)
+		private static unsafe void FillRow(int* previousRow, int length)
 		{
-			for (int i = 0; i < previousRow.Length; ++i)
+			for (int i = 0; i < length; ++i)
 			{
-				previousRow[i] = i+1;
+				previousRow[i] = i + 1;
 			}
 		}
 
