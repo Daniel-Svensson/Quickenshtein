@@ -17,10 +17,20 @@ namespace Quickenshtein.Benchmarks
 
 		static void Main(string[] args)
 		{
+			MediumTextComparisonBenchmark a = new MediumTextComparisonBenchmark();
+			a.StringA = "Aello World1";
+			a.StringB = "Be11o World2";
+			a.Scalar();
+			a.Simd();
+			a.Simd16();
+		//	return;
 			//var benchmark = new QuickenshteinBenchmark();
 			//benchmark.Setup();
 			//benchmark.Quickenshtein();
 			//return;
+			//BenchmarkRunner.Run(typeof(FillRowBenchmarks));
+			BenchmarkRunner.Run(typeof(MediumTextComparisonBenchmark));
+			return;
 
 			var summaries = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
 
