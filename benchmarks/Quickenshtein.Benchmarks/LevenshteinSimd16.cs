@@ -83,13 +83,15 @@ namespace Quickenshtein.Benchmarks
 				for (; rowIndex < sourceLength-8; rowIndex+=8)
 				{
 					// todo max
-					var diag = Vector128.Create((ushort)rowIndex);
-					var left = Vector128.Create((ushort)(rowIndex +1));
+					var temp = Vector128.Create(rowIndex);
+					var diag = Sse42.PackUnsignedSaturate(temp, temp);
+					var one = Vector128.Create((ushort)1);
+					var left = Sse42.AddSaturate(diag, one);
 
 					var sourceV = Sse42.LoadVector128((ushort*)(srcPtr + rowIndex));
 					var targetV = Vector128<ushort>.Zero;
-					var one = Vector128.Create((ushort)1);
-
+					
+					var shift = Vector128.CreateScalar(ushort.MaxValue);
 					// First 3  iterations fills the vector
 					for (int columnIndex = 0; columnIndex < 8; columnIndex++)
 					{
@@ -97,8 +99,11 @@ namespace Quickenshtein.Benchmarks
 						targetV = Sse42.ShiftLeftLogical128BitLane(targetV, 2);
 						targetV = Sse42.Insert(targetV, (ushort)targetPtr[columnIndex], 0);
 
-						left = Sse42.Insert(left, (ushort)(rowIndex + columnIndex + 1), (byte)columnIndex);
-
+						// Insert "(rowIndex + columnIndex + 1)" from the left
+						var leftValue = Vector128.Create(rowIndex + columnIndex + 1);
+						left = Sse42.Or(Sse42.And(shift, Sse42.PackUnsignedSaturate(leftValue, leftValue)), left);
+						shift = Sse42.ShiftLeftLogical128BitLane(shift, 2);
+						
 						// compare source to target
 						// alternativ, compare equal and OR with One
 						var match = Sse42.CompareEqual(sourceV, targetV);
@@ -140,7 +145,7 @@ namespace Quickenshtein.Benchmarks
 						diag = up;
 
 						// Store one value
-						previousRow[columnIndex - 7] = Sse42.Extract(next, 7);
+						previousRowPtr[columnIndex - 7] = Sse42.Extract(next, 7);
 					}
 
 					// Finish with last 3 items, dont read any more chars just extract them
@@ -164,7 +169,7 @@ namespace Quickenshtein.Benchmarks
 						left = next;
 						diag = up;
 						// Store one value
-						previousRow[i] = Sse42.Extract(next, 7);
+						previousRowPtr[i] = Sse42.Extract(next, 7);
 					}
 
 #if DEBUG
@@ -256,8 +261,12 @@ namespace Quickenshtein.Benchmarks
 				lastDeletionCost = previousRowPtr[columnIndex];
 				if (sourcePrevChar != targetPtr[columnIndex])
 				{
-					localCost = Math.Min(lastInsertionCost, localCost);
-					localCost = Math.Min(lastDeletionCost, localCost);
+					localCost = Sse41.Min(
+					Vector128.CreateScalar(localCost),
+						Sse41.Min(Vector128.CreateScalar(lastInsertionCost),
+							Vector128.CreateScalar(lastDeletionCost)))
+					.GetElement(0)
+						;
 					localCost++;
 				}
 				lastInsertionCost = localCost;

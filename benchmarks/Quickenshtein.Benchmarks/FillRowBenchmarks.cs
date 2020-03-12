@@ -12,7 +12,7 @@ namespace Quickenshtein.Benchmarks
 	public class FillRowBenchmarks
 	{
 		[Params(40, 400, 4000)]
-		int ArrayCount { get; set; } = 400;
+		public int ArrayCount { get; set; } = 400;
 		int[] _array;
 
 		[IterationSetup]
