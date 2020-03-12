@@ -12,6 +12,7 @@ namespace Quickenshtein
 	/// </summary>
 	public static partial class Levenshtein
 	{
+		[MethodImpl(MethodImplOptions.NoInlining)]
 		public static unsafe int GetDistance(ReadOnlySpan<char> source, ReadOnlySpan<char> target)
 		{
 			var sourceEnd = source.Length;

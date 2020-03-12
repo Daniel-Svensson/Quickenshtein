@@ -15,6 +15,8 @@ namespace Quickenshtein.Benchmarks
 {
 	public static class LevenshteinSimd16
 	{
+
+		[MethodImpl(MethodImplOptions.NoInlining)]
 		public static int GetDistance(string source, string target)
 		{
 			//Shortcut any processing if either string is empty
@@ -209,6 +211,7 @@ namespace Quickenshtein.Benchmarks
 		/// <summary>
 		/// Fills <paramref name="previousRow"/> with a number sequence from 1 to the length of the row.
 		/// </summary>
+		[MethodImpl(MethodImplOptions.NoInlining)]
 		private static unsafe void FillRow(int* previousRow, int length)
         {
 			for (int i = 0; i < length; ++i)
@@ -283,6 +286,7 @@ namespace Quickenshtein.Benchmarks
 		/// <param name="startIndex"></param>
 		/// <param name="sourceEnd"></param>
 		/// <param name="targetEnd"></param>
+		[MethodImpl(MethodImplOptions.NoInlining)]
 		private static unsafe void TrimInput_NetFramework(string source, string target, out int startIndex, out int sourceEnd, out int targetEnd)
 		{
 			sourceEnd = source.Length;

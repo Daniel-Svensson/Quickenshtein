@@ -26,7 +26,7 @@ namespace Quickenshtein
 		/// <param name="startIndex"></param>
 		/// <param name="sourceEnd"></param>
 		/// <param name="targetEnd"></param>
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		[MethodImpl(MethodImplOptions.NoInlining)]
 		private static unsafe void TrimInput_Avx2(ReadOnlySpan<char> source, ReadOnlySpan<char> target, ref int startIndex, ref int sourceEnd, ref int targetEnd)
 		{
 			var charactersAvailableToTrim = Math.Min(sourceEnd, targetEnd);
@@ -96,7 +96,7 @@ namespace Quickenshtein
 		/// AVX2 instructions allow for a maximum fill rate of 8 values at once.
 		/// </summary>
 		/// <param name="previousRow"></param>
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		[MethodImpl(MethodImplOptions.NoInlining)]
 		public static unsafe void FillRow_Avx2(Span<int> previousRow)
 		{
 			var columnIndex = 0;

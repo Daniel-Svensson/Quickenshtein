@@ -18,11 +18,17 @@ namespace Quickenshtein.Benchmarks
 		static void Main(string[] args)
 		{
 			MediumTextComparisonBenchmark a = new MediumTextComparisonBenchmark();
-			a.StringA = "Aello World1";
-			a.StringB = "Be11o World2";
-			a.Scalar();
-			a.Simd();
-			a.Simd16();
+			a.StringA = LongTextComparisonBenchmark.GetComparisonStrings().Where(s => !string.IsNullOrEmpty(s)).First();
+			a.StringB = LongTextComparisonBenchmark.GetComparisonStrings().Where(s => !string.IsNullOrEmpty(s)).Skip(1).First();
+
+			for (int i = 0; i < 1000; ++i)
+			{
+				a.Simd();
+				a.Simd16();
+				a.Quickenshtein();
+			}
+			return;
+
 		//	return;
 			//var benchmark = new QuickenshteinBenchmark();
 			//benchmark.Setup();

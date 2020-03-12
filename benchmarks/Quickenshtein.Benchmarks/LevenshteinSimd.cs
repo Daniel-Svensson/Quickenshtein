@@ -15,6 +15,8 @@ namespace Quickenshtein.Benchmarks
 {
 	public static class LevenshteinSimd
 	{
+
+		[MethodImpl(MethodImplOptions.NoInlining)]
 		public static int GetDistance(string source, string target)
 		{
 			//Shortcut any processing if either string is empty

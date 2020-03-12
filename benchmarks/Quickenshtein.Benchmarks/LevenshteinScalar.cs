@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 #if !NET472
+using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 #endif
 
@@ -54,11 +55,11 @@ namespace Quickenshtein.Benchmarks
 				targetLength = tempSourceLength;
 			}
 
-			
+
 			return CalculateDistance(source, sourceLength, target, targetLength, startIndex);
 		}
 
-		private static unsafe int CalculateDistance(string sourceString, int sourceLength, string targetString, int targetLength, int startIndex )
+		private static unsafe int CalculateDistance(string sourceString, int sourceLength, string targetString, int targetLength, int startIndex)
 		{
 			var arrayPool = ArrayPool<int>.Shared;
 			var pooledArray = arrayPool.Rent(targetLength);
@@ -126,14 +127,24 @@ namespace Quickenshtein.Benchmarks
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private static unsafe void CalculateRow(int* previousRowPtr, char* targetPtr, int targetLength, char sourcePrevChar, int lastInsertionCost, int lastSubstitutionCost)
 		{
-			for (int columnIndex=0; columnIndex < targetLength; ++ columnIndex)
+			for (int columnIndex = 0; columnIndex < targetLength; ++columnIndex)
 			{
 				int localCost = lastSubstitutionCost;
 				int lastDeletionCost = previousRowPtr[columnIndex];
 				if (sourcePrevChar != targetPtr[columnIndex])
 				{
-					localCost = Math.Min(lastInsertionCost, localCost);
-					localCost = Math.Min(lastDeletionCost, localCost);
+					localCost = Sse41.Min(
+						Vector128.CreateScalar(localCost),
+							Sse41.Min(Vector128.CreateScalar(lastInsertionCost),
+								Vector128.CreateScalar(lastDeletionCost)))
+						.GetElement(0)
+							;
+
+
+
+
+					//	localCost = Math.Min(lastInsertionCost, localCost);
+					//	localCost = Math.Min(lastDeletionCost, localCost);
 					localCost++;
 				}
 				lastInsertionCost = localCost;
