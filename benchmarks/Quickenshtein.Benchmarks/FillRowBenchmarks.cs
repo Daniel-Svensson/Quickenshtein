@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 using System.Text;
 using BenchmarkDotNet.Attributes;
 
@@ -14,11 +16,13 @@ namespace Quickenshtein.Benchmarks
 		[Params(40, 400, 4000)]
 		public int ArrayCount { get; set; } = 400;
 		int[] _array;
+		ushort[] _array2;
 
 		[IterationSetup]
 		public void Setup()
 		{
 			_array = new int[ArrayCount];
+			_array2 = new ushort[ArrayCount];
 		}
 
 		[Benchmark(Baseline = true)]
@@ -51,6 +55,20 @@ namespace Quickenshtein.Benchmarks
 		public unsafe void Simd()
 		{
 			FillRowSimd(_array);
+		}
+
+		[Benchmark]
+		public unsafe void Sse()
+		{
+			fixed (ushort* data = _array2)
+				FillRowSSe(data, _array2.Length);
+		}
+
+		[Benchmark]
+		public unsafe void SSeVector()
+		{
+			fixed (ushort* data = _array2)
+				FillRowSSeVector(data, _array2.Length);
 		}
 
 		[Benchmark]
@@ -129,6 +147,38 @@ namespace Quickenshtein.Benchmarks
 			}
 		}
 
+
+		private static unsafe void FillRowSSe(ushort* previousRow, int length)
+		{
+			var one = Vector128.CreateScalar((ushort)1);
+			var j = one;
+			for (int i = 0; i < length;)
+			{
+				previousRow[i] = j.GetElement(0);
+				j = Sse42.AddSaturate(j, one);
+			}
+		}
+
+		private static unsafe void FillRowSSeVector(ushort* previousRow, int length)
+		{
+			ushort* bytes = stackalloc ushort[] { 1, 2, 3, 4, 5, 6, 7, 8 };
+			var counter = Sse41.LoadVector128(bytes);
+			var step = Vector128.Create((ushort)8);
+
+			int i = 0;
+			for (; i < (length & 7); i += 8)
+			{
+				Sse42.Store(previousRow + i, counter);
+				counter = Sse42.AddSaturate(counter, step);
+			}
+			//step = Sse42.ShiftRightArithmetic
+			step = Vector128.Create((ushort)1);
+			for (; i < length; ++i)
+			{
+				previousRow[i] = counter.GetElement(0);
+				counter = Sse42.AddSaturate(counter, step);
+			}
+		}
 
 		/// <summary>
 		/// Fills <paramref name="previousRow"/> with a number sequence from 1 to the length of the row.
