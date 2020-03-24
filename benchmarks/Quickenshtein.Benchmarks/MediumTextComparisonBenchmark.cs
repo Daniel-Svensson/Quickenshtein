@@ -53,6 +53,12 @@ namespace Quickenshtein.Benchmarks
 			return LevenshteinSimd16.GetDistance(StringA, StringB);
 		}
 
+		[Benchmark()]
+		public int Simd16Avx()
+		{
+			return LevenshteinSimdAvx16.GetDistance(StringA, StringB);
+		}
+
 		public int BaseLine()
 		{
 			return LevenshteinBaseline.GetDistance(StringA, StringB);
