@@ -8,9 +8,8 @@ using BenchmarkDotNet.Attributes;
 
 namespace Quickenshtein.Benchmarks
 {
-	[BenchmarkDotNet.
-
-		Attributes.ShortRunJob]
+	[MediumRunJob]
+	[BenchmarkDotNet.Attributes.HardwareCounters]
 	public class FillRowBenchmarks
 	{
 		[Params(40, 400, 4000)]
@@ -31,7 +30,7 @@ namespace Quickenshtein.Benchmarks
 			FillRow(_array);
 		}
 
-	//	[Benchmark]
+		//	[Benchmark]
 		public unsafe void Pointer()
 		{
 			fixed (int* data = _array)
@@ -60,15 +59,15 @@ namespace Quickenshtein.Benchmarks
 		[Benchmark]
 		public unsafe void Sse()
 		{
-			fixed (ushort* data = _array2)
-				FillRowSSe(data, _array2.Length);
+			fixed (int* data = _array)
+				FillRowSSe(data, _array.Length);
 		}
 
 		[Benchmark]
 		public unsafe void SSeVector()
 		{
-			fixed (ushort* data = _array2)
-				FillRowSSeVector(data, _array2.Length);
+			fixed (int* data = _array)
+				FillRowSSeVector(data, _array.Length);
 		}
 
 		[Benchmark]
@@ -90,7 +89,7 @@ namespace Quickenshtein.Benchmarks
 			for (; i < lenght - 4; i += 4)
 			{
 				previousRow[i] = i;
-				previousRow[i+1] = i + 1;
+				previousRow[i + 1] = i + 1;
 				previousRow[i + 2] = i + 2;
 				previousRow[i + 3] = i + 3;
 			}
@@ -148,35 +147,50 @@ namespace Quickenshtein.Benchmarks
 		}
 
 
-		private static unsafe void FillRowSSe(ushort* previousRow, int length)
+		private static unsafe void FillRowSSe(int* previousRow, int length)
 		{
-			var one = Vector128.CreateScalar((ushort)1);
+			var one = Vector128.CreateScalar((int)1);
 			var j = one;
-			for (int i = 0; i < length;)
+			for (int i = 0; i < length; ++i)
 			{
 				previousRow[i] = j.GetElement(0);
-				j = Sse42.AddSaturate(j, one);
+				j = Sse42.Add(j, one);
 			}
 		}
 
-		private static unsafe void FillRowSSeVector(ushort* previousRow, int length)
+		private static unsafe void FillRowSSeVector(int* previousRow, int length)
 		{
-			ushort* bytes = stackalloc ushort[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-			var counter = Sse41.LoadVector128(bytes);
-			var step = Vector128.Create((ushort)8);
+			const int LENGHT = 4;
 
 			int i = 0;
-			for (; i < (length & 7); i += 8)
+			//int initialCount = Math.Min(count, previousRow.Length);
+			for (i = 0; i < length && i < LENGHT;)
+			{
+				previousRow[i] = (ushort)++i;
+			}
+
+			var counter = Sse41.LoadVector128(previousRow);
+			var step = Vector128.Create((int)LENGHT);
+			for (; i < (length & (LENGHT+ LENGHT-1)); i += LENGHT)
 			{
 				Sse42.Store(previousRow + i, counter);
-				counter = Sse42.AddSaturate(counter, step);
+				counter = Sse42.Add(counter, step);
+				i += LENGHT;
+				Sse42.Store(previousRow + i, counter);
+				counter = Sse42.Add(counter, step);
 			}
-			//step = Sse42.ShiftRightArithmetic
-			step = Vector128.Create((ushort)1);
-			for (; i < length; ++i)
+
+			if (i < (length & (LENGHT-1)))
 			{
-				previousRow[i] = counter.GetElement(0);
-				counter = Sse42.AddSaturate(counter, step);
+				Sse42.Store(previousRow + i, counter);
+				counter = Sse42.Add(counter, step);
+				i += LENGHT;
+			}
+
+			//step = Sse42.ShiftRightArithmetic
+			for (; i < length; )
+			{
+				previousRow[i] = ++i;
 			}
 		}
 
