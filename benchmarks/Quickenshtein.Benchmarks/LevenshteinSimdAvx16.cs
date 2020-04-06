@@ -123,12 +123,11 @@ namespace Quickenshtein.Benchmarks
 
 						left = next;
 						diag = up;
-
-						// Store one value
-						//previousRowPtr[i] = Sse42.Extract(next, 7);
 					}
 
-					previousRow[0] = left.GetElement(VECTOR_LENGTH-1);
+					var writePtr = previousRowPtr;
+					*writePtr = left.GetElement(VECTOR_LENGTH-1);
+					writePtr++;
 					for (int columnIndex = VECTOR_LENGTH; columnIndex < targetLength; columnIndex++)
 					{
 						// Shift in the next character
@@ -153,9 +152,9 @@ namespace Quickenshtein.Benchmarks
 						left = next;
 						diag = up;
 
-
 						// Store one value
-						previousRowPtr[columnIndex - (VECTOR_LENGTH - 1)] = next.GetElement(VECTOR_LENGTH - 1);;
+						*writePtr = next.GetElement(VECTOR_LENGTH - 1);
+						writePtr++;
 					}
 
 					// Finish with last 3 items, dont read any more chars just extract them
@@ -180,6 +179,7 @@ namespace Quickenshtein.Benchmarks
 						diag = up;
 						// Store one value
 						previousRowPtr[i] = left.GetElement(VECTOR_LENGTH - 1);
+				//		writePtr++;
 					}
 
 #if DEBUG

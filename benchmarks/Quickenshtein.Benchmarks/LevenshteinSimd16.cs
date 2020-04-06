@@ -123,7 +123,8 @@ namespace Quickenshtein.Benchmarks
 						diag = up;
 					}
 
-					previousRow[0] = Sse42.Extract(left, 7);
+					previousRowPtr[0] = Sse42.Extract(left, 7);
+					var writePtr = previousRowPtr + 1;
 					for (int columnIndex = 8; columnIndex < targetLength; columnIndex++)
 					{
 						// Shift in the next character
@@ -147,7 +148,8 @@ namespace Quickenshtein.Benchmarks
 						diag = up;
 
 						// Store one value
-						previousRowPtr[columnIndex - 7] = Sse42.Extract(next, 7);
+						*writePtr = Sse42.Extract(next, 7);
+						writePtr = writePtr + 1;
 					}
 
 					// Finish with last 3 items, dont read any more chars just extract them
@@ -211,7 +213,6 @@ namespace Quickenshtein.Benchmarks
 		/// <summary>
 		/// Fills <paramref name="previousRow"/> with a number sequence from 1 to the length of the row.
 		/// </summary>
-		[MethodImpl(MethodImplOptions.NoInlining)]
 		private static unsafe void FillRow(int* previousRow, int length)
         {
 			for (int i = 0; i < length; ++i)
