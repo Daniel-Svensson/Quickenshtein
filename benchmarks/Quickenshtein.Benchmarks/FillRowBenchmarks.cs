@@ -8,8 +8,9 @@ using BenchmarkDotNet.Attributes;
 
 namespace Quickenshtein.Benchmarks
 {
-	[MediumRunJob]
-	[BenchmarkDotNet.Attributes.HardwareCounters]
+	[BenchmarkDotNet.
+
+		Attributes.LongRunJob]
 	public class FillRowBenchmarks
 	{
 		[Params(40, 400, 4000)]
@@ -44,10 +45,18 @@ namespace Quickenshtein.Benchmarks
 		}
 
 		[Benchmark]
-		public unsafe void PointerUnroll()
+		public unsafe void PointerUnroll2()
 		{
 			fixed (int* data = _array)
-				FillRowUnroll(data, _array.Length);
+				FillRowUnroll2(data, _array.Length);
+		}
+
+
+		[Benchmark]
+		public unsafe void PointerUnroll3()
+		{
+			fixed (int* data = _array)
+				FillRowUnroll3(data, _array.Length);
 		}
 
 		[Benchmark]
@@ -59,12 +68,34 @@ namespace Quickenshtein.Benchmarks
 		[Benchmark]
 		public unsafe void Sse()
 		{
-			fixed (int* data = _array)
-				FillRowSSe(data, _array.Length);
+			fixed (ushort* data = _array2)
+				FillRowSSe(data, _array2.Length);
+		}
+
+
+		[Benchmark]
+		public unsafe void SSeVector16()
+		{
+			fixed (ushort* data = _array2)
+				FillRowSSeVector16(data, _array2.Length);
+		}
+
+		[Benchmark]
+		public unsafe void SSeVector16v2()
+		{
+			fixed (ushort* data = _array2)
+				FillRowSSeVector16v2(data, _array2.Length);
 		}
 
 		[Benchmark]
 		public unsafe void SSeVector()
+		{
+			fixed (int* data = _array)
+				FillRowSSeVector(data, _array.Length);
+		}
+
+		[Benchmark]
+		public unsafe void SSeVector2()
 		{
 			fixed (int* data = _array)
 				FillRowSSeVector(data, _array.Length);
@@ -83,6 +114,8 @@ namespace Quickenshtein.Benchmarks
 		}
 
 
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private static unsafe void FillRowUnroll(int* previousRow, int lenght)
 		{
 			int i = 0;
@@ -99,6 +132,49 @@ namespace Quickenshtein.Benchmarks
 				previousRow[i] = i;
 			}
 		}
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static unsafe void FillRowUnroll2(int* previousRow, int lenght)
+		{
+			int* pEnd = previousRow + lenght - 3;
+			int i = 0;
+			for (; previousRow < pEnd; previousRow += 4, i += 4)
+			{
+				previousRow[0] = i;
+				previousRow[1] = i + 1;
+				previousRow[2] = i + 2;
+				previousRow[3] = i + 3;
+			}
+
+			pEnd += 3;
+			for (; previousRow < pEnd; ++i, ++previousRow)
+			{
+				*previousRow = i;
+			}
+		}
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static unsafe void FillRowUnroll3(int* previousRow, int lenght)
+		{
+			int* pEnd = previousRow + lenght - 3;
+			int i = 0;
+			for (; previousRow < pEnd; previousRow += 4, i += 4)
+			{
+				previousRow[0] = ++i;
+				previousRow[1] = ++i;
+				previousRow[2] = ++i;
+				previousRow[3] = ++i;
+			}
+
+			pEnd += 3;
+			for (; previousRow < pEnd; ++previousRow)
+			{
+				*previousRow = ++i;
+			}
+		}
+
 		private static unsafe void FillRowP(int* previousRow, int lenght)
 		{
 			int i = 0;
@@ -110,6 +186,7 @@ namespace Quickenshtein.Benchmarks
 		}
 
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private static unsafe void FillRow(int[] previousRow)
 		{
 			int i = 0;
@@ -121,6 +198,8 @@ namespace Quickenshtein.Benchmarks
 			}
 		}
 
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private static unsafe void FillRowSimd(int[] previousRow)
 		{
 			// First 
@@ -146,53 +225,149 @@ namespace Quickenshtein.Benchmarks
 			}
 		}
 
-
-		private static unsafe void FillRowSSe(int* previousRow, int length)
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static unsafe void FillRowSSeVector16(ushort* previousRow, int length)
 		{
-			var one = Vector128.CreateScalar((int)1);
-			var j = one;
-			for (int i = 0; i < length; ++i)
+			const int LENGHT = 8;
+
+			int i = 0;
+			//int initialCount = Math.Min(count, previousRow.Length);
+			for (i = 0; i < LENGHT;)
 			{
-				previousRow[i] = j.GetElement(0);
-				j = Sse42.Add(j, one);
+				previousRow[i] = (ushort)++i;
+			}
+
+			var counter1 = Sse2.LoadVector128(previousRow);
+			var step = Vector128.Create((ushort)i);
+
+			ushort* pDest = previousRow + i;
+			for (; i < (length - (LENGHT - 1)); i += LENGHT)
+			{
+				counter1 = Sse2.Add(counter1, step);
+
+				Sse2.Store(pDest, counter1);
+				pDest += LENGHT;
+			}
+
+			for (; i < length;)
+			{
+				previousRow[i] = (ushort)++i;
 			}
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static unsafe void FillRowSSeVector16v2(ushort* previousRow, int length)
+		{
+			const int LENGHT = 8;
+
+			int i = 0;
+			//int initialCount = Math.Min(count, previousRow.Length);
+			for (i = 0; i < LENGHT;)
+			{
+				previousRow[i] = (ushort)++i;
+			}
+
+			var counter1 = Sse2.LoadVector128(previousRow);
+			var step = Vector128.Create((ushort)i);
+
+			ushort* pDest = previousRow + i;
+			for (; i < (length - (LENGHT - 1)); i += LENGHT)
+			{
+				counter1 = Sse2.AddSaturate(counter1, step);
+
+				Sse2.Store(pDest, counter1);
+				pDest += LENGHT;
+			}
+
+			for (; i < length;)
+			{
+				previousRow[i] = (ushort)++i;
+			}
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private static unsafe void FillRowSSeVector(int* previousRow, int length)
 		{
 			const int LENGHT = 4;
 
 			int i = 0;
 			//int initialCount = Math.Min(count, previousRow.Length);
-			for (i = 0; i < length && i < LENGHT;)
+			for (i = 0; i < LENGHT;)
 			{
-				previousRow[i] = (ushort)++i;
+				previousRow[i] = ++i;
 			}
 
-			var counter = Sse41.LoadVector128(previousRow);
-			var step = Vector128.Create((int)LENGHT);
-			for (; i < (length & (LENGHT+ LENGHT-1)); i += LENGHT)
+			var counter1 = Sse2.LoadVector128(previousRow);
+			var step = Vector128.Create(i);
+
+			int* pDest = previousRow + i;
+			for (; i < (length - (LENGHT - 1)); i += LENGHT)
 			{
-				Sse42.Store(previousRow + i, counter);
-				counter = Sse42.Add(counter, step);
-				i += LENGHT;
-				Sse42.Store(previousRow + i, counter);
-				counter = Sse42.Add(counter, step);
+				counter1 = Sse2.Add(counter1, step);
+
+				Sse2.Store(pDest, counter1);
+				pDest += LENGHT;
 			}
 
-			if (i < (length & (LENGHT-1)))
-			{
-				Sse42.Store(previousRow + i, counter);
-				counter = Sse42.Add(counter, step);
-				i += LENGHT;
-			}
-
-			//step = Sse42.ShiftRightArithmetic
-			for (; i < length; )
+			for (; i < length;)
 			{
 				previousRow[i] = ++i;
 			}
 		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static unsafe void FillRowSSeVector2(int* previousRow, int length)
+		{
+			const int LENGHT = 4;
+
+			int i = 0;
+			//int initialCount = Math.Min(count, previousRow.Length);
+			for (i = 0; i < 2 * LENGHT;)
+			{
+				previousRow[i] = ++i;
+			}
+
+			var counter1 = Sse41.LoadVector128(previousRow);
+			var counter2 = Sse41.LoadVector128(previousRow + LENGHT);
+			var step = Vector128.Create(i);
+
+			int* pDest = previousRow + i;
+			for (; i < (length - (2 * LENGHT-1)); i += 2 * LENGHT)
+			{
+				counter1 = Sse42.Add(counter1, step);
+				counter2 = Sse42.Add(counter2, step);
+
+				Sse42.Store(pDest, counter1);
+				Sse42.Store(pDest + LENGHT, counter2);
+				pDest += 2 * LENGHT;
+			}
+
+			if (i < (length - (LENGHT -1)))
+			{
+				counter1 = Sse42.Add(counter1, step);
+				Sse42.Store(previousRow + i, counter1);
+				i += LENGHT;
+			}
+
+			for (; i < length;)
+			{
+				previousRow[i] = ++i;
+			}
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static unsafe void FillRowSSe(ushort* previousRow, int length)
+		{
+			var one = Vector128.CreateScalar((ushort)1);
+			var j = one;
+			for (int i = 0; i < length; ++i)
+			{
+				previousRow[i] = j.GetElement(0);
+				j = Sse42.AddSaturate(j, one);
+			}
+		}
+
+
 
 		/// <summary>
 		/// Fills <paramref name="previousRow"/> with a number sequence from 1 to the length of the row.
