@@ -57,11 +57,11 @@ namespace Quickenshtein.Benchmarks
 				targetLength = tempSourceLength;
 			}
 
-			
+
 			return CalculateDistance(source, sourceLength, target, targetLength, startIndex);
 		}
 
-		private static unsafe int CalculateDistance(string sourceString, int sourceLength, string targetString, int targetLength, int startIndex )
+		private static unsafe int CalculateDistance(string sourceString, int sourceLength, string targetString, int targetLength, int startIndex)
 		{
 			var arrayPool = ArrayPool<int>.Shared;
 			var pooledArray = arrayPool.Rent(targetLength);
@@ -72,33 +72,35 @@ namespace Quickenshtein.Benchmarks
 			//ArrayPool values are sometimes bigger than allocated, let's trim our span to exactly what we use
 			previousRow = previousRow.Slice(0, targetLength);
 
-			FillRow(previousRow);
-
 			fixed (char* targetPtr = target)
 			fixed (char* srcPtr = source)
 			fixed (int* previousRowPtr = previousRow)
 			{
+				FillRow(previousRowPtr, targetLength);
+
 				var rowIndex = 0;
 
-				//var sourceV = Vector128<short>.Zero;
-
-				for (; rowIndex < sourceLength-4; rowIndex+=4)
+				for (; rowIndex < sourceLength - 3; rowIndex += 4)
 				{
 					var diag = Vector128.Create(rowIndex);
-					var left = Vector128.Create(rowIndex+1);
+					var left = Vector128.Create(rowIndex + 1);
 
 					var sourceV = Sse42.ConvertToVector128Int32((short*)(srcPtr + rowIndex));
 					var targetV = Vector128<int>.Zero;
 					var one = Vector128.Create(1);
 
 					// First 3  iterations fills the vector
+					var shift = Vector128.CreateScalar(-1);
 					for (int columnIndex = 0; columnIndex < 4; columnIndex++)
 					{
 						// Shift in the next character
 						targetV = Sse42.ShiftLeftLogical128BitLane(targetV, 4);
 						targetV = Sse42.Insert(targetV, (short)targetPtr[columnIndex], 0);
 
-						left = Sse42.Insert(left, rowIndex + columnIndex + 1, (byte)columnIndex);
+						//left = Sse42.Insert(left, rowIndex + columnIndex + 1, (byte)columnIndex);
+						var leftValue = Vector128.Create(rowIndex + columnIndex + 1);
+						left = Sse42.Or(Sse42.And(shift, leftValue), left);
+						shift = Sse42.ShiftLeftLogical128BitLane(shift, 4);
 
 						// compare source to target
 						// alternativ, compare equal and OR with One
@@ -125,7 +127,7 @@ namespace Quickenshtein.Benchmarks
 
 						// compare source to target
 						// alternativ, compare equal and OR with One
-						var match = Sse.CompareNotEqual(sourceV.AsSingle(), targetV.AsSingle());
+						var match = Sse42.CompareNotEqual(sourceV.AsSingle(), targetV.AsSingle());
 						var next = Sse42.Subtract(diag, match.AsInt32());
 
 						// Create next diag which is current up
@@ -199,16 +201,33 @@ namespace Quickenshtein.Benchmarks
 		}
 
 
-		/// <summary>
-		/// Fills <paramref name="previousRow"/> with a number sequence from 1 to the length of the row.
-		/// </summary>
-		/// <param name="previousRow"></param>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static unsafe void FillRow(Span<int> previousRow)
+		private static unsafe void FillRow(int* previousRow, int length)
 		{
-			for (int i=0; i < previousRow.Length; ++i)
+			const int LENGHT = 4;
+
+			int i = 0;
+			//int initialCount = Math.Min(count, previousRow.Length);
+			for (i = 0; i < LENGHT;)
 			{
-				previousRow[i] = i+1;
+				previousRow[i] = ++i;
+			}
+
+			var counter1 = Sse2.LoadVector128(previousRow);
+			var step = Vector128.Create(i);
+
+			int* pDest = previousRow + i;
+			for (; i < (length - (LENGHT - 1)); i += LENGHT)
+			{
+				counter1 = Sse2.Add(counter1, step);
+
+				Sse2.Store(pDest, counter1);
+				pDest += LENGHT;
+			}
+
+			for (; i < length;)
+			{
+				previousRow[i] = ++i;
 			}
 		}
 
