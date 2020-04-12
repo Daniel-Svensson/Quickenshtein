@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Quickenshtein.Benchmarks
 {
-	[MemoryDiagnoser]
+	//[MemoryDiagnoser]
 	//	[SimpleJob(RuntimeMoniker.NetCoreApp31, 3, 1, 3, 10)]
 
 	//	[SimpleJob(RuntimeMoniker.Net472)]
@@ -51,6 +51,12 @@ namespace Quickenshtein.Benchmarks
 		public int Simd16()
 		{
 			return LevenshteinSimd16.GetDistance(StringA, StringB);
+		}
+
+		[Benchmark()]
+		public int Simd16ushort()
+		{
+			return LevenshteinSimd16ushort.GetDistance(StringA, StringB);
 		}
 
 		[Benchmark()]
