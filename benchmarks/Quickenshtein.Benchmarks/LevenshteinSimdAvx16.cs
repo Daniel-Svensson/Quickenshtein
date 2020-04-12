@@ -81,7 +81,7 @@ namespace Quickenshtein.Benchmarks
 
 				//var sourceV = Vector128<short>.Zero;
 				const int VECTOR_LENGTH = 16;
-				for (; rowIndex < sourceLength - VECTOR_LENGTH; rowIndex += VECTOR_LENGTH)
+				for (; rowIndex < sourceLength - VECTOR_LENGTH-1; rowIndex += VECTOR_LENGTH)
 				{
 					// todo max
 					var temp = Vector128.Create(rowIndex);
@@ -94,7 +94,7 @@ namespace Quickenshtein.Benchmarks
 
 					var shift = Vector256.CreateScalar(ushort.MaxValue);
 					// First 3  iterations fills the vector
-					for (int columnIndex = 0; columnIndex < VECTOR_LENGTH; columnIndex++)
+					for (int columnIndex = 0; columnIndex < VECTOR_LENGTH-1; columnIndex++)
 					{
 						// Shift in the next character
 						targetV = ShiftLeft(targetV);

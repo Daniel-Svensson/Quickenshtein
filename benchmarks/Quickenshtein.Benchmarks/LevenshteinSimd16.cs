@@ -80,9 +80,7 @@ namespace Quickenshtein.Benchmarks
 
 				var rowIndex = 0;
 
-				//var sourceV = Vector128<short>.Zero;
-
-				for (; rowIndex < sourceLength-8; rowIndex+=8)
+				for (; rowIndex < sourceLength-7; rowIndex+=8)
 				{
 					// todo max
 					var temp = Vector128.Create(rowIndex);
@@ -213,11 +211,33 @@ namespace Quickenshtein.Benchmarks
 		/// <summary>
 		/// Fills <paramref name="previousRow"/> with a number sequence from 1 to the length of the row.
 		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private static unsafe void FillRow(int* previousRow, int length)
         {
-			for (int i = 0; i < length; ++i)
+			const int LENGHT = 4;
+
+			int i = 0;
+			//int initialCount = Math.Min(count, previousRow.Length);
+			for (i = 0; i < LENGHT;)
 			{
-				previousRow[i] = i + 1;
+				previousRow[i] = ++i;
+			}
+
+			var counter1 = Sse2.LoadVector128(previousRow);
+			var step = Vector128.Create(i);
+
+			int* pDest = previousRow + i;
+			for (; i < (length - (LENGHT - 1)); i += LENGHT)
+			{
+				counter1 = Sse2.Add(counter1, step);
+
+				Sse2.Store(pDest, counter1);
+				pDest += LENGHT;
+			}
+
+			for (; i < length;)
+			{
+				previousRow[i] = ++i;
 			}
 		}
 
@@ -252,30 +272,29 @@ namespace Quickenshtein.Benchmarks
 		private static unsafe void CalculateRow(int* previousRowPtr, char* targetPtr, int targetLength, char sourcePrevChar, int lastInsertionCost, int lastSubstitutionCost)
 		{
 			var columnIndex = 0;
-			int lastDeletionCost;
-			int localCost;
-
 			var rowColumnsRemaining = targetLength;
+
+			Vector128<int> one = Vector128.CreateScalar(1);
+			Vector128<int> lastSubstition = Vector128.CreateScalar(lastSubstitutionCost);
+			Vector128<int> lastInsertion = Vector128.CreateScalar(lastInsertionCost);
+			Vector128<int> localCost;
+			Vector128<int> lastDeletion;
 
 			while (rowColumnsRemaining > 0)
 			{
 				rowColumnsRemaining--;
 
-				localCost = lastSubstitutionCost;
-				lastDeletionCost = previousRowPtr[columnIndex];
+				localCost = lastSubstition;
+				lastDeletion = Vector128.CreateScalar(previousRowPtr[columnIndex]);
 				if (sourcePrevChar != targetPtr[columnIndex])
 				{
-					localCost = Sse41.Min(
-					Vector128.CreateScalar(localCost),
-						Sse41.Min(Vector128.CreateScalar(lastInsertionCost),
-							Vector128.CreateScalar(lastDeletionCost)))
-					.GetElement(0)
-						;
-					localCost++;
+					localCost = Sse2.Add(one,
+						Sse41.Min(localCost,
+						Sse41.Min(lastInsertion, lastDeletion)));
 				}
-				lastInsertionCost = localCost;
-				previousRowPtr[columnIndex++] = localCost;
-				lastSubstitutionCost = lastDeletionCost;
+				lastInsertion = localCost;
+				previousRowPtr[columnIndex++] = localCost.GetElement(0);
+				lastSubstition = lastDeletion;
 			}
 		}
 

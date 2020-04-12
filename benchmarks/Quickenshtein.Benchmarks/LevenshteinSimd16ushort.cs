@@ -13,7 +13,7 @@ using System.Runtime.Intrinsics.X86;
 
 namespace Quickenshtein.Benchmarks
 {
-	public static class LevenshteinSimd
+	public static class LevenshteinSimd16ushort
 	{
 
 		[MethodImpl(MethodImplOptions.NoInlining)]
@@ -63,9 +63,9 @@ namespace Quickenshtein.Benchmarks
 
 		private static unsafe int CalculateDistance(string sourceString, int sourceLength, string targetString, int targetLength, int startIndex)
 		{
-			var arrayPool = ArrayPool<int>.Shared;
+			var arrayPool = ArrayPool<ushort>.Shared;
 			var pooledArray = arrayPool.Rent(targetLength);
-			Span<int> previousRow = pooledArray;
+			Span<ushort> previousRow = pooledArray;
 			ReadOnlySpan<char> source = sourceString.AsSpan().Slice(startIndex, sourceLength);
 			ReadOnlySpan<char> target = targetString.AsSpan().Slice(startIndex, targetLength);
 
@@ -74,97 +74,107 @@ namespace Quickenshtein.Benchmarks
 
 			fixed (char* targetPtr = target)
 			fixed (char* srcPtr = source)
-			fixed (int* previousRowPtr = previousRow)
+			fixed (ushort* previousRowPtr = previousRow)
 			{
 				FillRow(previousRowPtr, targetLength);
 
 				var rowIndex = 0;
 
-				for (; rowIndex < sourceLength - 3; rowIndex += 4)
+				for (; rowIndex < sourceLength - 7; rowIndex += 8)
 				{
-					var diag = Vector128.Create(rowIndex);
-					var left = Vector128.Create(rowIndex + 1);
+					// todo max
+					var temp = Vector128.Create(rowIndex);
+					var diag = Sse42.PackUnsignedSaturate(temp, temp);
+					var one = Vector128.Create((ushort)1);
+					var left = Sse42.AddSaturate(diag, one);
 
-					var sourceV = Sse42.ConvertToVector128Int32((short*)(srcPtr + rowIndex));
-					var targetV = Vector128<int>.Zero;
-					var one = Vector128.Create(1);
+					var sourceV = Sse42.LoadVector128((ushort*)(srcPtr + rowIndex));
+					var targetV = Vector128<ushort>.Zero;
 
+					var shift = Vector128.CreateScalar(ushort.MaxValue);
 					// First 3  iterations fills the vector
-					var shift = Vector128.CreateScalar(-1);
-					for (int columnIndex = 0; columnIndex < 4; columnIndex++)
+					for (int columnIndex = 0; columnIndex < 7; columnIndex++)
 					{
 						// Shift in the next character
-						targetV = Sse42.ShiftLeftLogical128BitLane(targetV, 4);
-						targetV = Sse42.Insert(targetV, (short)targetPtr[columnIndex], 0);
+						targetV = Sse42.ShiftLeftLogical128BitLane(targetV, 2);
+						targetV = Sse42.Insert(targetV, (ushort)targetPtr[columnIndex], 0);
 
-						//left = Sse42.Insert(left, rowIndex + columnIndex + 1, (byte)columnIndex);
+						// Insert "(rowIndex + columnIndex + 1)" from the left
 						var leftValue = Vector128.Create(rowIndex + columnIndex + 1);
-						left = Sse42.Or(Sse42.And(shift, leftValue), left);
-						shift = Sse42.ShiftLeftLogical128BitLane(shift, 4);
+						left = Sse42.Or(Sse42.And(shift, Sse42.PackUnsignedSaturate(leftValue, leftValue)), left);
+						shift = Sse42.ShiftLeftLogical128BitLane(shift, 2);
 
 						// compare source to target
 						// alternativ, compare equal and OR with One
-						var match = Sse.CompareNotEqual(sourceV.AsSingle(), targetV.AsSingle());
-						var next = Sse42.Subtract(diag, match.AsInt32());
+						var match = Sse42.CompareEqual(sourceV, targetV);
+						var add = Sse42.AndNot(match, one);
+						var next = Sse42.AddSaturate(diag, add);
 
 						// Create next diag which is current up
-						var up = Sse42.ShiftLeftLogical128BitLane(left, 4);
-						up = Sse42.Insert(up, previousRowPtr[columnIndex], 0);
+						var up = Sse42.ShiftLeftLogical128BitLane(left, 2);
+						up = Sse42.Insert(up, (ushort)previousRowPtr[columnIndex], 0);
 
-						var tmp = Sse42.Add(Sse42.Min(left, up), one);
+						var tmp = Sse42.AddSaturate(Sse42.Min(left, up), one);
 						next = Sse42.Min(next, tmp);
 
 						left = next;
 						diag = up;
 					}
 
-					previousRow[0] = Sse42.Extract(left, 3);
-					for (int columnIndex = 4; columnIndex < targetLength; columnIndex++)
+					previousRowPtr[0] = Sse42.Extract(left, 7);
+					var writePtr = previousRowPtr + 1;
+					for (int columnIndex = 8; columnIndex < targetLength; columnIndex++)
 					{
 						// Shift in the next character
-						targetV = Sse42.ShiftLeftLogical128BitLane(targetV, 4);
-						targetV = Sse42.Insert(targetV, (short)targetPtr[columnIndex], 0);
+						targetV = Sse42.ShiftLeftLogical128BitLane(targetV, 2);
+						targetV = Sse42.Insert(targetV, (ushort)targetPtr[columnIndex], 0);
 
 						// compare source to target
 						// alternativ, compare equal and OR with One
-						var match = Sse42.CompareNotEqual(sourceV.AsSingle(), targetV.AsSingle());
-						var next = Sse42.Subtract(diag, match.AsInt32());
+						var match = Sse42.CompareEqual(sourceV, targetV);
+						var add = Sse42.AndNot(match, one);
+						var next = Sse42.AddSaturate(diag, add);
 
 						// Create next diag which is current up
-						var up = Sse42.ShiftLeftLogical128BitLane(left, 4);
-						up = Sse42.Insert(up, previousRowPtr[columnIndex], 0);
+						var up = Sse42.ShiftLeftLogical128BitLane(left, 2);
+						up = Sse42.Insert(up, (ushort)previousRowPtr[columnIndex], 0);
 
-						var tmp = Sse42.Add(Sse42.Min(left, up), one);
+						var tmp = Sse42.AddSaturate(Sse42.Min(left, up), one);
 						next = Sse42.Min(next, tmp);
 
 						left = next;
 						diag = up;
 
 						// Store one value
-						previousRow[columnIndex - 3] = Sse42.Extract(next, 3);
+						*writePtr = Sse42.Extract(next, 7);
+						writePtr = writePtr + 1;
+
+						// Store one value
+						//previousRowPtr[columnIndex - 7] = Sse42.Extract(next, 7);
 					}
 
 					// Finish with last 3 items, dont read any more chars just extract them
-					for (int i = targetLength - 3; i < targetLength; i++)
+					for (int i = targetLength - 7; i < previousRow.Length; i++)
 					{
 						// Shift in the next character
-						targetV = Sse42.ShiftLeftLogical128BitLane(targetV, 4);
+						targetV = Sse42.ShiftLeftLogical128BitLane(targetV, 2);
 
 						// compare source to target
 						// alternativ, compare equal and OR with One
-						var match = Sse.CompareNotEqual(sourceV.AsSingle(), targetV.AsSingle());
-						var next = Sse42.Subtract(diag, match.AsInt32());
+						var match = Sse42.CompareEqual(sourceV, targetV);
+						var add = Sse42.AndNot(match, one);
+						var next = Sse42.AddSaturate(diag, add);
 
 						// Create next diag which is current up
-						var up = Sse42.ShiftLeftLogical128BitLane(left, 4);
+						var up = Sse42.ShiftLeftLogical128BitLane(left, 2);
 
-						var tmp = Sse42.Add(Sse42.Min(left, up), one);
+						var tmp = Sse42.AddSaturate(Sse42.Min(left, up), one);
 						next = Sse42.Min(next, tmp);
 
 						left = next;
 						diag = up;
 						// Store one value
-						previousRow[i] = Sse42.Extract(next, 3);
+						previousRowPtr[i] = Sse42.Extract(next, 7);
 					}
 
 #if DEBUG
@@ -201,35 +211,38 @@ namespace Quickenshtein.Benchmarks
 		}
 
 
+		/// <summary>
+		/// Fills <paramref name="previousRow"/> with a number sequence from 1 to the length of the row.
+		/// </summary>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static unsafe void FillRow(int* previousRow, int length)
+		private static unsafe void FillRow(ushort* previousRow, int length)
 		{
-			const int LENGHT = 4;
+			const int LENGHT = 8;
 
 			int i = 0;
 			//int initialCount = Math.Min(count, previousRow.Length);
 			for (i = 0; i < LENGHT;)
 			{
-				previousRow[i] = ++i;
+				previousRow[i] = (ushort)++i;
 			}
 
 			var counter1 = Sse2.LoadVector128(previousRow);
-			var step = Vector128.Create(i);
+			var step = Vector128.Create((ushort)i);
 
-			int* pDest = previousRow + i;
+			ushort* pDest = previousRow + i;
 			for (; i < (length - (LENGHT - 1)); i += LENGHT)
 			{
-				counter1 = Sse2.Add(counter1, step);
-
+				counter1 = Sse2.AddSaturate(counter1, step);
 				Sse2.Store(pDest, counter1);
 				pDest += LENGHT;
 			}
 
 			for (; i < length;)
 			{
-				previousRow[i] = ++i;
+				previousRow[i] = (ushort)++i;
 			}
 		}
+
 
 		/// <summary>
 		/// Calculates the costs for an entire row of the virtual matrix.
@@ -241,16 +254,21 @@ namespace Quickenshtein.Benchmarks
 		/// <param name="lastInsertionCost"></param>
 		/// <param name="lastSubstitutionCost"></param>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static unsafe void CalculateRow(int* previousRowPtr, char* targetPtr, int targetLength, char sourcePrevChar, int lastInsertionCost, int lastSubstitutionCost)
+		private static unsafe void CalculateRow(ushort* previousRowPtr, char* targetPtr, int targetLength, char sourcePrevChar, int lastInsertionCost, int lastSubstitutionCost)
 		{
+			static Vector128<ushort> ToUshortScalar(int i)
+			{
+				var xmm = Vector128.Create(i);
+				return Sse41.PackUnsignedSaturate(xmm, xmm);
+			}
 			var columnIndex = 0;
 			var rowColumnsRemaining = targetLength;
 
-			Vector128<int> one = Vector128.CreateScalar(1);
-			Vector128<int> lastSubstition = Vector128.CreateScalar(lastSubstitutionCost);
-			Vector128<int> lastInsertion = Vector128.CreateScalar(lastInsertionCost);
-			Vector128<int> localCost;
-			Vector128<int> lastDeletion;
+			Vector128<ushort> one = Vector128.CreateScalar((ushort)1);
+			Vector128<ushort> lastSubstition = ToUshortScalar(lastSubstitutionCost);
+			Vector128<ushort> lastInsertion = ToUshortScalar(lastInsertionCost);
+			Vector128<ushort> localCost;
+			Vector128<ushort> lastDeletion;
 
 			while (rowColumnsRemaining > 0)
 			{
@@ -260,7 +278,7 @@ namespace Quickenshtein.Benchmarks
 				lastDeletion = Vector128.CreateScalar(previousRowPtr[columnIndex]);
 				if (sourcePrevChar != targetPtr[columnIndex])
 				{
-					localCost = Sse2.Add(one,
+					localCost = Sse2.AddSaturate(one,
 						Sse41.Min(localCost,
 						Sse41.Min(lastInsertion, lastDeletion)));
 				}
@@ -278,6 +296,7 @@ namespace Quickenshtein.Benchmarks
 		/// <param name="startIndex"></param>
 		/// <param name="sourceEnd"></param>
 		/// <param name="targetEnd"></param>
+		[MethodImpl(MethodImplOptions.NoInlining)]
 		private static unsafe void TrimInput_NetFramework(string source, string target, out int startIndex, out int sourceEnd, out int targetEnd)
 		{
 			sourceEnd = source.Length;
