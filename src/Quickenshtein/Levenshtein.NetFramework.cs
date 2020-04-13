@@ -1,11 +1,11 @@
-﻿#if NETSTANDARD2_0
-using System;
+﻿using System;
 using System.Runtime.CompilerServices;
 
 namespace Quickenshtein
 {
 	public static partial class Levenshtein
 	{
+#if NETSTANDARD2_0
 		public static int GetDistance(string source, string target)
 		{
 			//Shortcut any processing if either string is empty
@@ -54,7 +54,7 @@ namespace Quickenshtein
 				targetSpan.Slice(startIndex, targetLength)
 			);
 		}
-
+#endif
 		/// <summary>
 		/// Specifically used for <see cref="GetDistance(string, string)"/> - helps defer `AsSpan` overhead on .NET Framework
 		/// </summary>
@@ -64,7 +64,7 @@ namespace Quickenshtein
 		/// <param name="sourceEnd"></param>
 		/// <param name="targetEnd"></param>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static unsafe void TrimInput_NetFramework(string source, string target, out int startIndex, out int sourceEnd, out int targetEnd)
+		public static unsafe void TrimInput_NetFramework(string source, string target, out int startIndex, out int sourceEnd, out int targetEnd)
 		{
 			sourceEnd = source.Length;
 			targetEnd = target.Length;
@@ -87,4 +87,3 @@ namespace Quickenshtein
 		}
 	}
 }
-#endif

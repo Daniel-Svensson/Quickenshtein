@@ -27,7 +27,7 @@ namespace Quickenshtein
 		/// <param name="sourceEnd"></param>
 		/// <param name="targetEnd"></param>
 		[MethodImpl(MethodImplOptions.NoInlining)]
-		private static unsafe void TrimInput_Avx2(ReadOnlySpan<char> source, ReadOnlySpan<char> target, ref int startIndex, ref int sourceEnd, ref int targetEnd)
+		public static unsafe void TrimInput_Avx2(ReadOnlySpan<char> source, ReadOnlySpan<char> target, ref int startIndex, ref int sourceEnd, ref int targetEnd)
 		{
 			var charactersAvailableToTrim = Math.Min(sourceEnd, targetEnd);
 			if (charactersAvailableToTrim >= VECTOR256_NUMBER_OF_CHARACTERS)
