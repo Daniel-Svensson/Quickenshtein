@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
@@ -35,7 +36,7 @@ namespace Quickenshtein.Benchmarks
 					StringA = "D" + StringA;
 					break;
 				case Direction.Both:
-					StringA = StringA.Substring(0, ArrayCount/2) + "D" + StringA.Substring(ArrayCount/2, ArrayCount/2);
+					StringA = StringA.Substring(0, ArrayCount / 2) + "D" + StringA.Substring(ArrayCount / 2, ArrayCount / 2);
 					break;
 			}
 		}
@@ -72,6 +73,38 @@ namespace Quickenshtein.Benchmarks
 			return (start, end1, end2);
 		}
 
+		public static unsafe void TrimInput_Simple(string source, string target, out int start, out int end1, out int end2)
+		{
+			int sourceEnd = source.Length;
+			int targetEnd = target.Length;
+			int startIndex = 0;
+
+			int charactersAvailableToTrim = Math.Min(sourceEnd, targetEnd);
+
+			fixed (char* sourcePtr = source)
+			fixed (char* targetPtr = target)
+			{
+				ushort* sourceUShortPtr = (ushort*)sourcePtr;
+				ushort* targetUShortPtr = (ushort*)targetPtr;
+
+				while (charactersAvailableToTrim > 0 && sourceUShortPtr[startIndex] == targetUShortPtr[startIndex])
+				{
+					charactersAvailableToTrim--;
+					startIndex++;
+				}
+
+				while (charactersAvailableToTrim > 0 && sourceUShortPtr[sourceEnd - 1] == targetUShortPtr[targetEnd - 1])
+				{
+					charactersAvailableToTrim--;
+					sourceEnd--;
+					targetEnd--;
+				}
+			}
+			start = startIndex;
+			end1 = sourceEnd;
+			end2 = targetEnd;
+		}
+
 		public static unsafe void TrimInput_SSe(string source, string target, out int startIndex, out int sourceEnd, out int targetEnd)
 		{
 			const int VECTOR128_NUMBER_OF_CHARACTERS = 8;
@@ -90,9 +123,9 @@ namespace Quickenshtein.Benchmarks
 
 				if (charactersAvailableToTrim >= VECTOR128_NUMBER_OF_CHARACTERS)
 				{
-					while (charactersAvailableToTrim >= VECTOR128_NUMBER_OF_CHARACTERS)
+					while (true)
 					{
-						int sectionEquality = Sse42.MoveMask(
+						int sectionEquality = Sse2.MoveMask(
 							Sse2.CompareEqual(
 								Sse2.LoadVector128(sourceUShortPtr + startIndex),
 								Sse2.LoadVector128(targetUShortPtr + startIndex)
@@ -101,15 +134,41 @@ namespace Quickenshtein.Benchmarks
 
 						if (sectionEquality != ALL_EQUAL)
 						{
+							int index = BitOperations.TrailingZeroCount((uint)sectionEquality ^ ALL_EQUAL) >> 1;
+							startIndex += index;
+							charactersAvailableToTrim -= index;
 							break;
 						}
 
 						startIndex += VECTOR128_NUMBER_OF_CHARACTERS;
 						charactersAvailableToTrim -= VECTOR128_NUMBER_OF_CHARACTERS;
+
+						if (charactersAvailableToTrim < VECTOR128_NUMBER_OF_CHARACTERS)
+						{
+							while (charactersAvailableToTrim > 0
+								&& sourceUShortPtr[startIndex] == targetUShortPtr[startIndex])
+							{
+								charactersAvailableToTrim--;
+								startIndex++;
+							}
+							break;
+						}
 					}
 
-					while (charactersAvailableToTrim >= VECTOR128_NUMBER_OF_CHARACTERS)
+					while (true)
 					{
+						if (charactersAvailableToTrim < VECTOR128_NUMBER_OF_CHARACTERS)
+						{
+							while (charactersAvailableToTrim > 0
+								&& sourceUShortPtr[sourceEnd - 1] == targetUShortPtr[targetEnd - 1])
+							{
+								charactersAvailableToTrim--;
+								sourceEnd--;
+								targetEnd--;
+							}
+							break;
+						}
+
 						int sectionEquality = Sse2.MoveMask(
 							Sse2.CompareEqual(
 								Sse2.LoadVector128(sourceUShortPtr + (sourceEnd - VECTOR128_NUMBER_OF_CHARACTERS + 1)),
@@ -119,6 +178,10 @@ namespace Quickenshtein.Benchmarks
 
 						if (sectionEquality != ALL_EQUAL)
 						{
+							int index = (BitOperations.LeadingZeroCount((uint)sectionEquality ^ ALL_EQUAL) - 16) >> 1;
+							sourceEnd -= index;
+							targetEnd -= index;
+							charactersAvailableToTrim -= index;
 							break;
 						}
 
@@ -127,21 +190,7 @@ namespace Quickenshtein.Benchmarks
 						charactersAvailableToTrim -= VECTOR128_NUMBER_OF_CHARACTERS;
 					}
 				}
-
-				while (charactersAvailableToTrim > 0 && sourceUShortPtr[startIndex] == targetUShortPtr[startIndex])
-				{
-					charactersAvailableToTrim--;
-					startIndex++;
-				}
-
-				while (charactersAvailableToTrim > 0 && sourceUShortPtr[sourceEnd - 1] == targetUShortPtr[targetEnd - 1])
-				{
-					charactersAvailableToTrim--;
-					sourceEnd--;
-					targetEnd--;
-				}
 			}
-
 		}
 	}
 }
