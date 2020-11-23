@@ -213,7 +213,7 @@ namespace Quickenshtein
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static unsafe void CalculateDiagonalSection_Sse41<T>(void* refDiag1Ptr, void* refDiag2Ptr, char* sourcePtr, char* targetPtr, ref int rowIndex, int columnIndex) where T : struct
+		public static unsafe void CalculateDiagonalSection_Sse41<T>(void* refDiag1Ptr, void* refDiag2Ptr, char* sourcePtr, char* targetPtr, ref int rowIndex, int columnIndex) where T : struct
 		{
 			if (typeof(T) == typeof(int))
 			{
@@ -264,7 +264,7 @@ namespace Quickenshtein
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static unsafe void CalculateDiagonalSection_Avx2<T>(void* refDiag1Ptr, void* refDiag2Ptr, char* sourcePtr, char* targetPtr, ref int rowIndex, int columnIndex) where T : struct
+		public static unsafe void CalculateDiagonalSection_Avx2<T>(void* refDiag1Ptr, void* refDiag2Ptr, char* sourcePtr, char* targetPtr, ref int rowIndex, int columnIndex) where T : struct
 		{
 			if (typeof(T) == typeof(int))
 			{

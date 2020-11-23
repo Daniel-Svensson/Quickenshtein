@@ -217,24 +217,24 @@ namespace Quickenshtein.Benchmarks
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private static unsafe void FillRow(ushort* previousRow, int length)
 		{
-			const int LENGHT = 8;
-
 			int i = 0;
 			//int initialCount = Math.Min(count, previousRow.Length);
-			for (i = 0; i < LENGHT;)
+
+			// Jit will do loop onrolling due to loop 0..Vector128<ushort>.Count-1
+			for (i = 0; i < Vector128<ushort>.Count; ++i)
 			{
-				previousRow[i] = (ushort)++i;
+				previousRow[i] = (ushort)(i+1);
 			}
 
 			var counter1 = Sse2.LoadVector128(previousRow);
 			var step = Vector128.Create((ushort)i);
 
 			ushort* pDest = previousRow + i;
-			for (; i < (length - (LENGHT - 1)); i += LENGHT)
+			for (; i < (length - (Vector128<ushort>.Count - 1)); i += Vector128<ushort>.Count)
 			{
 				counter1 = Sse2.AddSaturate(counter1, step);
 				Sse2.Store(pDest, counter1);
-				pDest += LENGHT;
+				pDest += Vector128<ushort>.Count;
 			}
 
 			for (; i < length;)

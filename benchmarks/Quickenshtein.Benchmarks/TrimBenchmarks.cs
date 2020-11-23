@@ -42,29 +42,21 @@ namespace Quickenshtein.Benchmarks
 		}
 
 		[Benchmark]
-		public (int, int, int) QuickensteinNetframework()
+		public unsafe (int, int, int) QuickensteinNetframework()
 		{
-			int start = 0, end1 = StringA.Length, end2 = StringB.Length;
-			Quickenshtein.Levenshtein.TrimInput(StringA.AsSpan(), StringB.AsSpan(), ref start, ref end1, ref end2);
-			return (start, end1, end2);
+			int  end1 = StringA.Length, end2 = StringB.Length;
+
+			fixed (char* sourcePtr = StringA)
+			fixed (char* targetPtr = StringB)
+			{
+				int start = Quickenshtein.Internal.DataHelper.GetIndexOfFirstNonMatchingCharacter(sourcePtr, targetPtr, end1, end2);
+				Quickenshtein.Internal.DataHelper.TrimLengthOfMatchingCharacters(sourcePtr, targetPtr, ref end1, ref end2);
+
+				return (start, end1, end2);
+			}
 		}
 
 
-		[Benchmark]
-		public (int, int, int) QuickensteinNetFramework()
-		{
-			int start, end1, end2;
-			Quickenshtein.Levenshtein.TrimInput_NetFramework(StringA, StringB, out start, out end1, out end2);
-			return (start, end1, end2);
-		}
-
-		[Benchmark]
-		public (int, int, int) QuickensteinAVX()
-		{
-			int start = 0, end1 = StringA.Length, end2 = StringB.Length;
-			Quickenshtein.Levenshtein.TrimInput_Avx2(StringA.AsSpan(), StringB.AsSpan(), ref start, ref end1, ref end2);
-			return (start, end1, end2);
-		}
 
 		[Benchmark]
 		public (int, int, int) TrimInputSSe()

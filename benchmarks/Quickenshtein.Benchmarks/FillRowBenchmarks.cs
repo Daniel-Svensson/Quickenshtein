@@ -102,18 +102,11 @@ namespace Quickenshtein.Benchmarks
 		}
 
 		[Benchmark]
-		public unsafe void QuickensteingAvx()
+		public unsafe void QuickensteingDataHelper()
 		{
-			Quickenshtein.Levenshtein.FillRow_Avx2(_array);
+			fixed (int* data = _array)
+				Quickenshtein.Internal.DataHelper.SequentialFill(data, _array.Length);
 		}
-
-		[Benchmark]
-		public unsafe void QuickensteingSSe()
-		{
-			Quickenshtein.Levenshtein.FillRow_Sse2(_array);
-		}
-
-
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private static unsafe void FillRowUnroll(int* previousRow, int lenght)
@@ -228,11 +221,9 @@ namespace Quickenshtein.Benchmarks
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private static unsafe void FillRowSSeVector16(ushort* previousRow, int length)
 		{
-			const int LENGHT = 8;
-
 			int i = 0;
 			//int initialCount = Math.Min(count, previousRow.Length);
-			for (i = 0; i < LENGHT;)
+			for (i = 0; i < Vector128<ushort>.Count;)
 			{
 				previousRow[i] = (ushort)++i;
 			}
@@ -241,12 +232,12 @@ namespace Quickenshtein.Benchmarks
 			var step = Vector128.Create((ushort)i);
 
 			ushort* pDest = previousRow + i;
-			for (; i < (length - (LENGHT - 1)); i += LENGHT)
+			for (; i < (length - (Vector128<ushort>.Count - 1)); i += Vector128<ushort>.Count)
 			{
 				counter1 = Sse2.Add(counter1, step);
 
 				Sse2.Store(pDest, counter1);
-				pDest += LENGHT;
+				pDest += Vector128<ushort>.Count;
 			}
 
 			for (; i < length;)
@@ -258,11 +249,9 @@ namespace Quickenshtein.Benchmarks
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private static unsafe void FillRowSSeVector16v2(ushort* previousRow, int length)
 		{
-			const int LENGHT = 8;
-
 			int i = 0;
 			//int initialCount = Math.Min(count, previousRow.Length);
-			for (i = 0; i < LENGHT;)
+			for (i = 0; i < Vector128<ushort>.Count;)
 			{
 				previousRow[i] = (ushort)++i;
 			}
@@ -271,12 +260,11 @@ namespace Quickenshtein.Benchmarks
 			var step = Vector128.Create((ushort)i);
 
 			ushort* pDest = previousRow + i;
-			for (; i < (length - (LENGHT - 1)); i += LENGHT)
+			for (; i < (length - (Vector128<ushort>.Count - 1)); i += Vector128<ushort>.Count)
 			{
 				counter1 = Sse2.AddSaturate(counter1, step);
-
 				Sse2.Store(pDest, counter1);
-				pDest += LENGHT;
+				pDest += Vector128<ushort>.Count;
 			}
 
 			for (; i < length;)

@@ -34,7 +34,7 @@ namespace Quickenshtein.Benchmarks.Config
 		protected void AddCoreWithoutIntrinsics(bool asBaseline = false)
 		{
 			AddJob(Job.Default
-				.WithRuntime(CoreRuntime.Core30)
+				.WithRuntime(CoreRuntime.Core31)
 				.WithEnvironmentVariable(ENV_ENABLE_HWINTRINSICS, "0")
 				.WithId("Core (No Intrinsics)"), asBaseline);
 		}
@@ -42,7 +42,7 @@ namespace Quickenshtein.Benchmarks.Config
 		protected void AddCoreWithoutSSE41(bool asBaseline = false)
 		{
 			AddJob(Job.Default
-				.WithRuntime(CoreRuntime.Core30)
+				.WithRuntime(CoreRuntime.Core31)
 				.WithEnvironmentVariable(ENV_ENABLE_SSE41, "0")
 				.WithId("Core (w/o SSE41)"), asBaseline);
 		}
@@ -50,7 +50,7 @@ namespace Quickenshtein.Benchmarks.Config
 		protected void AddCoreWithoutAVX2(bool asBaseline = false)
 		{
 			AddJob(Job.Default
-				.WithRuntime(CoreRuntime.Core30)
+				.WithRuntime(CoreRuntime.Core31)
 				.WithEnvironmentVariable(ENV_ENABLE_AVX2, "0")
 				.WithId("Core (w/o AVX2)"), asBaseline);
 		}
@@ -58,7 +58,7 @@ namespace Quickenshtein.Benchmarks.Config
 		protected void AddCore(bool asBaseline = false)
 		{
 			AddJob(Job.Default
-				.WithRuntime(CoreRuntime.Core30)
+				.WithRuntime(CoreRuntime.Core31)
 				.WithId("Core (All Intrinsics)"), asBaseline);
 		}
 
